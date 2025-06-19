@@ -1,0 +1,73 @@
+{
+  "task_type": {
+    "type": "Image classification",
+    "description": "Can upload a single image or an image folder. The image is a single image containing the object to be classified. Using the model, classify the image into one of the 1000 classes. After that, map the label to the human-readable label using the label_mapping.json file. Visualize the image and the predicted label."
+  },
+  "input_output": {
+    "input": "A single image containing the object to be classified.",
+    "output": "The predicted label for the image, which is a human-readable label."
+  },
+  "model_info": {
+    "api_url": "http://34.142.220.207:8000/api/image-classification",
+    "name": "timm/mobilenetv3_small_100.lamb_in1k",
+    "input_format": {
+      "type": "json",
+      "structure": {
+        "data": {
+          "type": "base64",
+          "encoding": "UTF-8",
+          "description": "The image is encoded in base64 format."
+        }
+      }
+    },
+    "output_format": {
+      "type": "array",
+      "description": "Raw logits for 1000 ImageNet classes.",
+      "post_processing": {
+        "softmax": "Convert logits to probabilities"
+      },
+      "guidance": [
+        "Convert the output to numpy array",
+        "Find the highest probability class using np.argmax",
+        "Get the corresponding class name from label_mapping.json"
+      ]
+    }
+  },
+  "visualization": {
+    "description": "The visualization of the image and the predicted label. Each data item includes:\n- The input image\n- The predicted label (mapped to human-readable label using label_mapping.json)\n- The probability of the predicted label",
+    "features": [
+      {
+        "name": "list_display",
+        "description": "Show a list of input data and their prediction results.",
+        "fields": [
+          {
+            "name": "input_image",
+            "description": "The input image."
+          },
+          {
+            "name": "predicted_label",
+            "description": "The predicted label. The label should be a human-readable label. (Mapping the label to the human-readable label using the label_mapping.json file.)"
+          },
+          {
+            "name": "predicted_label_probability",
+            "description": "The probability of the predicted label."
+          }
+        ]
+      },
+      {
+        "name": "input_function",
+        "description": "Allow users to enter new images for image classification.",
+        "steps": [
+          "Enter a list of images.",
+          "Display the prediction result (label, label probability)."
+        ]
+      }
+    ]
+  },
+  "dataset": {
+    "data_path": "./data",
+    "description": "ImageNet-1K is a dataset of over 14 million images belonging to 1000 classes.",
+    "supported_formats": ["jpg", "jpeg", "png"],
+    "other_data": "File label_mapping.json is a dictionary that maps the numerical label to the corresponding meaning label."
+  }
+}
