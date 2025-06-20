@@ -154,6 +154,7 @@ class TaskMeta(BaseModel):
 
 class UIPlannerOutput(BaseModel):
     task_type: str
+    task_description: str
     meta: TaskMeta
 
     input_spec: InputSpec
