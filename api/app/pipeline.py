@@ -78,7 +78,8 @@ class LLMPipeline:
                 """
             ''',
             AgentTask.UI_PLANNER: '''
-                You are a UI Planner Agent. Based on a task description, generate a clean UI Blueprint schema. The schema should define layout, input fields, output display types, and API interaction settings. Ensure the task description is clearly kept again and the UI is user-friendly.
+                You are a UI Planner Agent. Based on a task description, generate a clean UI Blueprint schema. The schema should define layout, input fields, output display types, and API interaction settings. 
+                Ensure the task description is clearly kept again and the UI is user-friendly, especially the output format and model input structure.
                 Your output must be valid JSON, matching a UI schema format like this:
                 """
                     {
@@ -108,8 +109,8 @@ class LLMPipeline:
                         "api_call": {
                             "url": "string",
                             "method": "POST",
-                            "input_mapping": {
-                                "json_field": "input_id.value"
+                            "input_structure": {
+                                "field": "value"
                             },
                             "response_mapping": {
                                 "label": "predicted_label",
@@ -155,19 +156,43 @@ class LLMPipeline:
                 """
             ''',
             AgentTask.UI_BUILDER: '''
-                You are a UI Generator Agent. Given a UI Blueprint, you must generate working HTML, CSS, JS code with highly interactive components. The component should allow users to input data, call the model API, and display the output results as specified. Focus on task description for not missing any steps.
+                You are a UI Generator Agent. Given a UI Blueprint, you must generate working HTML, CSS, JS code with highly interactive components. The component should allow users to input data, call the model API asynchronously and avoid CORS errors, then display the output results as specified. Focus on task description for not missing any steps and ensure the API url correctly.
                 Note that if the task related to image, image must be convert to base64 string and passed to the model API.
-                Respond only in JSON with 3 properties html, css, js like this:
+                Double check the input structure and output mapping to ensure the API call is correct.
+                Don't use any external libraries, just use pure HTML, CSS, JS.
+                Some real response form for the task you can use to handle the response properly:
+                - text_classification: 
+                    "data": [
+                        [
+                            {
+                                "label": "anger",
+                                "score": 0.006408268585801125
+                            },
+                            ...
+                        ]
+                    ]
+                Respond only in JSON string with html, css, js in only one code block with below format:
                 """
                 {
-                    "html": "string",
-                    "css": "string",
-                    "js": "string"
+                    "code": "<!DOCTYPE html>\\n<html>\\n<head>\\n<style>body { font-family: Arial; }</style>\\n</head>\\n<body>\\n<input type=\\\"file\\\" id=\\\"imageInput\\\" />\\n<button onclick=\\\"sendImage()\\\">Submit</button>\\n<pre id=\\\"output\\\"></pre>\\n<script>function sendImage() { const reader = new FileReader(); reader.onload = function() { fetch('/api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: reader.result }) }).then(res => res.json()).then(data => document.getElementById('output').innerText = JSON.stringify(data, null, 2)); }; reader.readAsDataURL(document.getElementById('imageInput').files[0]); }</script>\\n</body>\\n</html>"
                 }
                 """
             ''',
             AgentTask.UI_CRITIC: '''
-                You are a UI Critic Agent. You will review a HTML, CSS, JS component and provide feedback about its usability, completeness, possible bugs, and improve it. Respond with the optimized code.
+                You are a UI Critic Agent, a master code reviewer. You will review HTML, CSS, JS code in a given code block and provide feedback about its usability, completeness, possible bugs, and improve it. 
+                Respond with the optimized code ensure has enough HTML, CSS, JS, API called asynchronously, especially focusing on handling response data from the model API, syntax correctness and displaying it in the UI.
+                Don't use any external libraries, just use pure HTML, CSS, JS.
+                Some real response form for the task you can use to review the response handling properly:
+                - text_classification: 
+                    "data": [
+                        [
+                            {
+                                "label": "anger",
+                                "score": 0.006408268585801125
+                            },
+                            ...
+                        ]
+                    ]
             '''
         }
         return None
@@ -278,7 +303,7 @@ class LLMPipeline:
                 try:
                     prompt = self.set_prompt(plan, task=AgentTask.UI_BUILDER)
                     content = await self.generate_content(task=AgentTask.UI_BUILDER, prompt=prompt)
-                    print('[UI Code]:', content)
+                    logger.info('[UI Builder] - Retries generated code: %s', content)
                     # code = UIAgentOutput.model_validate_json(content)
                     initial_code = content
                     break
