@@ -5,7 +5,7 @@ import json
 import textgrad as tg
 
 from app.util import logger
-from app.constant import AgentTask
+from app.constant import AgentTask, ProblemTask
 from app.prompt import set_task_analyzer_prompt, set_task_ui_builder_prompt, set_task_ui_planner_prompt
 from app.schema import TaskAnalyzerOutput, UIAgentOutput, UIPlannerOutput
 import asyncio
@@ -162,17 +162,6 @@ class LLMPipeline:
                 Note that if the task related to image, image must be convert to base64 string and passed to the model API.
                 Double check the input structure and output mapping to ensure the API call is correct.
                 Don't use any external libraries, just use pure HTML, CSS, JS.
-                Some real response form for the task you can use to handle the response properly:
-                - text_classification: 
-                    "data": [
-                        [
-                            {
-                                "label": "anger",
-                                "score": 0.006408268585801125
-                            },
-                            ...
-                        ]
-                    ]
                 Respond only in JSON string with html, css, js in only one code block with below format:
                 """
                 {
@@ -184,17 +173,7 @@ class LLMPipeline:
                 You are a UI Critic Agent, a master code reviewer. You will review HTML, CSS, JS code in a given code block and provide feedback about its usability, completeness, possible bugs, and improve it. 
                 Respond with the optimized code ensure has enough HTML, CSS, JS, API called ASYNCHRONOUSLY, especially focusing on handling response data from the model API, syntax correctness and displaying it in the UI.
                 Don't use any external libraries, just use pure HTML, CSS, JS, ensure the API url correctly.
-                Some real response form for the task you can use to review the response handling properly:
-                - text_classification: 
-                    "data": [
-                        [
-                            {
-                                "label": "anger",
-                                "score": 0.006408268585801125
-                            },
-                            ...
-                        ]
-                    ]
+                Based on the following requirements, provide a detailed review and optimization of the code:
             '''
         }
         return None
@@ -208,6 +187,78 @@ class LLMPipeline:
             return json.dumps(UIAgentOutput.model_json_schema(), indent=2)
         return None
     
+    def get_detailed_requirements(self, problem_type):
+        logger.info('[LLMPipeline] - Getting detailed requirements for problem type: %s compared with %s', problem_type, ProblemTask.IMAGE_CLASSIFICATION)
+        if problem_type == ProblemTask.TEXT_CLASSIFICATION.value:
+            return '''
+                1. Receive a text passage input from the user.,
+                2. Send a POST request to the API endpoint: http://34.142.220.207:8000/api/text-classification with payload: { \"texts\": <text_passage> }.,
+                3. Receive a response which is a list of objects containing:,
+                    - label: the predicted emotion label,
+                    - score: the probability of that emotion,
+                    Below is an example response:
+                        "data": [
+                            [
+                                {
+                                    "label": "anger",
+                                    "score": 0.006408268585801125
+                                },
+                                ...
+                            ]
+                        ]
+                4. Sort the list by 'score' in descending order.,
+                5. Select the emotion with the highest score as the final predicted emotion.,
+                6. Map this predicted emotion to its corresponding emoji:,
+                    - anger: 😠,
+                    - disgust: 🤢,
+                    - fear: 😨,
+                    - joy: 😄,
+                    - neutral: 😐,
+                    - sadness: 😢,
+                    - surprise: 😲,
+                7. Display the following for each input:,
+                    - input_text: The original input text passage.,
+                    - predicted_emotion: The emotion with the highest score.,
+                    - emotion_probabilities: All emotion labels and their scores.,
+                    - emotion_emoji: The emoji corresponding to the predicted emotion.
+            '''
+        elif problem_type == ProblemTask.IMAGE_CLASSIFICATION.value:
+            
+            return '''
+                1. Convert the uploaded image to base64 format.,
+                2. Send a POST request to the API endpoint: http://34.142.220.207:8000/api/image-classification with JSON payload: { \"data\": <base64_string> }.,
+                3. Receive a response with raw logits for 1000 ImageNet classes in the following format:
+                    "data": 
+                        [
+                            [
+                                -2.800873279571533,
+                                -3.0401227474212646,
+                                -3.838620662689209,
+                                ....,
+                            ]
+                        ]
+                4. Convert the logits to a NumPy array.,
+                5. Apply softmax to get class probabilities.,
+                6. Find the index of the highest probability using np.argmax.,
+                7. Load label_mapping.json and map the index to its human-readable label.,
+                8. Display the following for each image:,
+                    - The input image,
+                    - The predicted label (from label_mapping.json),
+                    - The probability score of that label (as a percentage or decimal)
+            '''
+        elif problem_type == ProblemTask.AUDIO_CLASSIFICATION.value:
+            return '''
+        
+            '''
+        elif problem_type == ProblemTask.OBJECT_DETECTION.value:
+            return '''
+        
+            '''
+        elif problem_type == ProblemTask.TABULAR_QUESTION_ANSWERING.value:
+            return '''
+        
+            '''
+        return None
 
     def get_role_prompt(self, task):
         return self.role_prompts.get(task, None)
@@ -248,15 +299,26 @@ class LLMPipeline:
         
         return None
         
-    async def generate_content(self, task, prompt):
+    async def generate_content(self, task, prompt, problem_type=None):
         print(f"Model name: {MODEL_NAME}")
+        role_prompt = self.get_role_prompt(task)
         if not MODEL_NAME:
             raise ValueError("MODEL_NAME is not set. Please set it in the config file.")
+        if problem_type:
+            detailed_requirements = self.get_detailed_requirements(problem_type)
+            logger.info('[LLMPipeline] - Detailed requirements for problem type %s: %s', problem_type, detailed_requirements)
+            if detailed_requirements:
+                role_prompt = f'''
+                    {role_prompt}
+                    Below are the detailed requirements for the problem type {problem_type}:
+                    {detailed_requirements}
+                '''
+        logger.info('[LLMPipeline] - Role prompt: %s', role_prompt)
         chat_completion = await self.client.chat.completions.create(
                 messages=[
                     {
                         "role": "system",
-                        "content": f"{self.get_role_prompt(task)}\n"
+                        "content": f"{role_prompt}\n"
                     },
                     {
                         "role": "user",
@@ -290,12 +352,12 @@ class LLMPipeline:
             return {"error": "Invalid JSON response from the model."}
         return raw_plan
 
-    async def ui_builder(self, plan, optimize=False):
+    async def ui_builder(self, problem_type, plan, optimize=False):
         prompt = self.set_prompt(plan, task=AgentTask.UI_BUILDER)
         initial_code = None
         response_feedback = None
         try:
-            content = await self.generate_content(task=AgentTask.UI_BUILDER, prompt=prompt)
+            content = await self.generate_content(task=AgentTask.UI_BUILDER, prompt=prompt, problem_type=problem_type)
             code = UIAgentOutput.model_validate_json(content)
             logger.info('[UI Builder] - Generated code: %s', code)
             initial_code = code
@@ -304,7 +366,7 @@ class LLMPipeline:
             for attempt in range(max_retries):
                 try:
                     prompt = self.set_prompt(plan, task=AgentTask.UI_BUILDER)
-                    content = await self.generate_content(task=AgentTask.UI_BUILDER, prompt=prompt)
+                    content = await self.generate_content(task=AgentTask.UI_BUILDER, prompt=prompt, problem_type=problem_type)
                     logger.info('[UI Builder] - Retries generated code: %s', content)
                     # code = UIAgentOutput.model_validate_json(content)
                     initial_code = content
@@ -316,19 +378,27 @@ class LLMPipeline:
                     await asyncio.sleep(1.5)
         if optimize:
             # _optimize_code is async, so just await it directly
-            final_code = await self._optimize_code(plan, initial_code)
+            final_code = await self._optimize_code(plan, initial_code, problem_type)
         else:
             final_code = initial_code
         return final_code
     
 
-    async def _optimize_code(self, original_input, initial_code):
+    async def _optimize_code(self, original_input, initial_code, problem_type):
         if hasattr(initial_code, "model_dump"):
             serializable_code = initial_code.model_dump()
         else:
             serializable_code = initial_code
+        detailed_requirements = self.get_detailed_requirements(problem_type)
+        role_description = self.get_role_prompt(AgentTask.UI_CRITIC)
+        if detailed_requirements:
+            role_description = f'''
+                {role_description}
+                Below are the detailed requirements for the problem type {problem_type}:
+                {detailed_requirements}
+            '''
         input_code = tg.Variable(json.dumps(serializable_code),
-                role_description=self.get_role_prompt(AgentTask.UI_CRITIC),
+                role_description=role_description,
                 requires_grad=True)
         self._set_optimization_instruction(original_input, initial_code, response_feedback=None)
         self.optimizer = tg.TGD(parameters=[input_code])

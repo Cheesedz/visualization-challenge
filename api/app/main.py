@@ -28,8 +28,10 @@ def read_root():
 async def chat(chat: Chat):
     pipeline = LLMPipeline()
     processed_task = await pipeline.task_analyze(chat.content)
+    problem_type = json.loads(processed_task).get('task_type').get('type')
+    # print('processed_task: ', json.loads(processed_task).get('task_type').get('type'))
     plan = await pipeline.ui_planner(processed_task)
-    # return {"plan": plan}
-    final_code = await pipeline.ui_builder(plan, optimize=True)
+    # # return {"plan": plan}
+    final_code = await pipeline.ui_builder(problem_type, plan, optimize=True)
     print(f'type of output ', type(final_code))
     return { "final_code": final_code }
