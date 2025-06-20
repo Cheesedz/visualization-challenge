@@ -15,3 +15,7 @@ uvicorn==0.34.3
 textgrad
 groq
 aiofiles==24.1.0
+python-multipart==0.0.20
+sse-starlette==2.3.6
+supabase
+uuid
