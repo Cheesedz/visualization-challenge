@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: Arial;
+      }
+      .navbar {
+        background-color: #333;
+        color: #fff;
+        padding: 1em;
+        text-align: center;
+      }
+      .navbar a {
+        color: #fff;
+        text-decoration: none;
+        margin: 0 1em;
+      }
+      .navbar a:hover {
+        color: #ccc;
+      }
+      .wizard {
+        max-width: 800px;
+        margin: 2em auto;
+        padding: 2em;
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      .wizard h2 {
+        margin-top: 0;
+      }
+      .wizard form {
+        display: flex;
+        flex-direction: column;
+      }
+      .wizard input[type="text"] {
+        padding: 1em;
+        margin-bottom: 1em;
+      }
+      .wizard button {
+        background-color: #333;
+        color: #fff;
+        padding: 1em 2em;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .wizard button:hover {
+        background-color: #444;
+      }
+      .output {
+        margin-top: 2em;
+      }
+      .output table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      .output table th,
+      .output table td {
+        border: 1px solid #ddd;
+        padding: 1em;
+        text-align: left;
+      }
+      .output table th {
+        background-color: #f0f0f0;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar" role="navigation">
+      <a href="#" role="link">Home</a> | <a href="#about" role="link">About</a>
+    </nav>
+    <div class="wizard">
+      <h2>Emotion Text Classification</h2>
+      <form>
+        <input
+          type="text"
+          id="text_input"
+          placeholder="Write a text passage here..."
+          aria-label="Text input"
+        />
+        <button onclick="predictEmotion()" role="button">
+          Predict Emotion
+        </button>
+      </form>
+      <div class="output">
+        <table id="emotion_results">
+          <thead>
+            <tr>
+              <th>Input Text</th>
+              <th>Predicted Emotion</th>
+              <th>Emotion Probabilities</th>
+              <th>Emotion Emoji</th>
+            </tr>
+          </thead>
+          <tbody id="emotion_results_body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="error_message"></div>
+  </body>
+  <script>
+    const apiUrl = "http://34.142.220.207:8000/api/text-classification";
+    let isLoading = false;
+
+    async function predictEmotion() {
+      if (isLoading) return;
+      isLoading = true;
+      const text = document.getElementById("text_input").value;
+      const errorMessageElement = document.getElementById("error_message");
+      errorMessageElement.innerHTML = "";
+      await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          texts: [text],
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          isLoading = false;
+          const emotionResultsBody = document.getElementById(
+            "emotion_results_body"
+          );
+          emotionResultsBody.innerHTML = "";
+          data.data[0].forEach((result) => {
+            const row = document.createElement("tr");
+            const inputTextCell = document.createElement("td");
+            inputTextCell.textContent = text;
+            row.appendChild(inputTextCell);
+            const predictedEmotionCell = document.createElement("td");
+            predictedEmotionCell.textContent = result.label;
+            row.appendChild(predictedEmotionCell);
+            const emotionProbabilitiesCell = document.createElement("td");
+            emotionProbabilitiesCell.textContent = result.score.toFixed(2);
+            row.appendChild(emotionProbabilitiesCell);
+            const emotionEmojiCell = document.createElement("td");
+            emotionEmojiCell.innerHTML = getEmotionEmoji(result.label);
+            row.appendChild(emotionEmojiCell);
+            emotionResultsBody.appendChild(row);
+          });
+        })
+        .catch((error) => {
+          isLoading = false;
+          errorMessageElement.innerHTML = "Error: " + error.message;
+        });
+    }
+
+    function getEmotionEmoji(emotion) {
+      switch (emotion) {
+        case "anger":
+          return "😠";
+        case "disgust":
+          return "😝";
+        case "fear":
+          return "😨";
+        case "joy":
+          return "😊";
+        case "neutral":
+          return "😐";
+        case "sadness":
+          return "😔";
+        case "surprise":
+          return "😮";
+        default:
+          return "";
+      }
+    }
+  </script>
+</html>

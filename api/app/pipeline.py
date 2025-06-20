@@ -156,7 +156,9 @@ class LLMPipeline:
                 """
             ''',
             AgentTask.UI_BUILDER: '''
-                You are a UI Generator Agent. Given a UI Blueprint, you must generate working HTML, CSS, JS code with highly interactive components. The component should allow users to input data, call the model API asynchronously and avoid CORS errors, then display the output results as specified. Focus on task description for not missing any steps and ensure the API url correctly.
+                You are a UI Generator Agent. Given a UI Blueprint, you must generate working HTML, CSS, JS code with highly interactive components and eye-catching effects. 
+                The component should allow users to input data, call the model API ASYNCHRONOUSLY and avoid CORS errors, then display the output results as specified. 
+                Focus on task description for not missing any steps and ensure the API url correctly.
                 Note that if the task related to image, image must be convert to base64 string and passed to the model API.
                 Double check the input structure and output mapping to ensure the API call is correct.
                 Don't use any external libraries, just use pure HTML, CSS, JS.
@@ -174,14 +176,14 @@ class LLMPipeline:
                 Respond only in JSON string with html, css, js in only one code block with below format:
                 """
                 {
-                    "code": "<!DOCTYPE html>\\n<html>\\n<head>\\n<style>body { font-family: Arial; }</style>\\n</head>\\n<body>\\n<input type=\\\"file\\\" id=\\\"imageInput\\\" />\\n<button onclick=\\\"sendImage()\\\">Submit</button>\\n<pre id=\\\"output\\\"></pre>\\n<script>function sendImage() { const reader = new FileReader(); reader.onload = function() { fetch('/api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: reader.result }) }).then(res => res.json()).then(data => document.getElementById('output').innerText = JSON.stringify(data, null, 2)); }; reader.readAsDataURL(document.getElementById('imageInput').files[0]); }</script>\\n</body>\\n</html>"
+                    "code": "<!DOCTYPE html>\\n<html>\\n<head>\\n<style>body { font-family: Arial; }</style>\\n</head>\\n<body>\\n<input type=\\\"file\\\" id=\\\"imageInput\\\" />\\n<button onclick=\\\"sendImage()\\\">Submit</button>\\n<pre id=\\\"output\\\"></pre>\\n<script>async function sendImage() { const reader = new FileReader(); reader.onload = function() { await fetch('/api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: reader.result }) }).then(res => res.json()).then(data => document.getElementById('output').innerText = JSON.stringify(data, null, 2)); }; reader.readAsDataURL(document.getElementById('imageInput').files[0]); }</script>\\n</body>\\n</html>"
                 }
                 """
             ''',
             AgentTask.UI_CRITIC: '''
                 You are a UI Critic Agent, a master code reviewer. You will review HTML, CSS, JS code in a given code block and provide feedback about its usability, completeness, possible bugs, and improve it. 
-                Respond with the optimized code ensure has enough HTML, CSS, JS, API called asynchronously, especially focusing on handling response data from the model API, syntax correctness and displaying it in the UI.
-                Don't use any external libraries, just use pure HTML, CSS, JS.
+                Respond with the optimized code ensure has enough HTML, CSS, JS, API called ASYNCHRONOUSLY, especially focusing on handling response data from the model API, syntax correctness and displaying it in the UI.
+                Don't use any external libraries, just use pure HTML, CSS, JS, ensure the API url correctly.
                 Some real response form for the task you can use to review the response handling properly:
                 - text_classification: 
                     "data": [
