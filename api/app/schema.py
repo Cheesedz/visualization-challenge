@@ -1,8 +1,10 @@
 from typing import List, Optional, Literal, Union, Dict
 from pydantic import BaseModel, HttpUrl
+from fastapi import UploadFile, File, Form
 
 class Chat(BaseModel):
-    content: str
+    content: Optional[str]
+    file: Optional[UploadFile] = File(None)
 
 # === Task Analyzer Agent ===
 

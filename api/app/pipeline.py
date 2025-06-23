@@ -17,7 +17,7 @@ class LLMPipeline:
             api_key=GROQ_API_KEY
         )
         # set the backward model to evaluate the summaries
-        tg.set_backward_engine("groq-llama3-70b-8192", override=True)
+        tg.set_backward_engine("groq-llama-3.3-70b-versatile", override=True)
 
         self.role_prompts = {
             AgentTask.TASK_ANALYZER : '''
